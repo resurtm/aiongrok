@@ -4,3 +4,5 @@
 /*.egg-info/
 *.py[doc]
 __pycache/
+/build/
+/dist/
