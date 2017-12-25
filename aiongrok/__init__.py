@@ -8,10 +8,12 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 
 class TunnelError(Exception):
+    """Exception which represents tunnel errors."""
     pass
 
 
 class TunnelNotFound(TunnelError):
+    """Exception which would be used in case tunnel cannot be found."""
     pass
 
 
@@ -58,14 +60,26 @@ class Session:
         url = '{}tunnels'.format(self.api_url)
         async with self.session.get(url) as response:
             data = await response.json()
+            if response.status != 200:
+                logging.warning(data['msg'])
+                raise TunnelNotFound(data['msg'])
         tunnels = TunnelsCollection()
         for item in data['tunnels']:
-            tunnel = Tunnel(name=item['name'],
-                            uri=item['uri'],
-                            proto=item['proto'],
-                            public_url=item['public_url'])
-            tunnels.append(tunnel)
+            tunnels.append(self.__make_tunnel(item))
         return tunnels
 
     async def get_tunnel(self, name):
-        pass
+        url = '{}tunnels/{}'.format(self.api_url, name)
+        async with self.session.get(url) as response:
+            data = await response.json()
+            if response.status != 200:
+                logging.warning(data['msg'])
+                raise TunnelNotFound(data['msg'])
+        return self.__make_tunnel(data)
+
+    @staticmethod
+    def __make_tunnel(item):
+        return Tunnel(name=item['name'],
+                      uri=item['uri'],
+                      proto=item['proto'],
+                      public_url=item['public_url'])
