@@ -1,0 +1,6 @@
+/.idea/
+/venv/
+/test*.py
+/*.egg-info/
+*.py[doc]
+__pycache/
