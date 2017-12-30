@@ -89,12 +89,13 @@ class Session:
         """
         async with self._session.get(self._url('api')) as resp:
             data = await resp.json()
-            if resp.status != 200:
-                msg = 'unable to make root request'
-                logging.warning(msg)
-                raise RootError(msg)
-        logging.debug("got '/api' response:")
+        logging.debug("GET '/api' response:")
         logging.debug(json.dumps(data, indent=4, sort_keys=True))
+        if self._bad_status(resp):
+            msg = 'unable to make request'
+            msg = data['msg'] if 'msg' in data else msg
+            logging.warning(msg)
+            raise RootError(msg)
         return data
 
     async def get_tunnels(self) -> TunnelsCollection:
@@ -103,12 +104,13 @@ class Session:
         """
         async with self._session.get(self._url('api/tunnels')) as resp:
             data = await resp.json()
-            if resp.status != 200:
-                msg = 'unable to fetch tunnels list'
-                logging.warning(msg)
-                raise RootError(msg)
-        logging.debug("got '/api/tunnels' response:")
+        logging.debug("GET '/api/tunnels' response:")
         logging.debug(json.dumps(data, indent=4, sort_keys=True))
+        if self._bad_status(resp):
+            msg = 'unable to fetch tunnels list'
+            msg = data['msg'] if 'msg' in data else msg
+            logging.warning(msg)
+            raise RootError(msg)
         tunnels = [self._make_tunnel(item) for item in data['tunnels']]
         return TunnelsCollection(tunnels)
 
@@ -116,7 +118,18 @@ class Session:
         """Makes request to POST '/api/tunnel/{name}' endpoint.
         Creates a new tunnel.
         """
-        raise NotImplementedError()
+        url = self._url('api/tunnels/')
+        data = {'name': 'test', 'proto': 'http', 'addr': 9200}
+        async with self._session.post(url, data=json.dumps(data)) as resp:
+            data = await resp.json()
+        logging.debug("POST '/api/tunnels/' response:")
+        logging.debug(json.dumps(data, indent=4, sort_keys=True))
+        if self._bad_status(resp):
+            msg = 'unable to create new tunnel'
+            msg = data['msg'] if 'msg' in data else msg
+            logging.warning(msg)
+            raise TunnelError(msg)
+        return self._make_tunnel(data)
 
     async def get_tunnel(self, name: str) -> Tunnel:
         """Gets response from GET '/api/tunnel/{name}' endpoint.
@@ -125,9 +138,13 @@ class Session:
         url = self._url('api/tunnels/{}').format(name)
         async with self._session.get(url) as resp:
             data = await resp.json()
-            if resp.status != 200:
-                logging.warning(data['msg'])
-                raise TunnelError(data['msg'])
+        logging.debug("GET '/api/tunnels/{name}' response:")
+        logging.debug(json.dumps(data, indent=4, sort_keys=True))
+        if self._bad_status(resp):
+            msg = 'unable to get tunnel info'
+            msg = data['msg'] if 'msg' in data else msg
+            logging.warning(msg)
+            raise TunnelError(msg)
         return self._make_tunnel(data)
 
     async def stop_tunnel(self, name: str):
@@ -137,10 +154,12 @@ class Session:
         url = self._url('api/tunnels/{}').format(name)
         async with self._session.delete(url) as resp:
             data = await resp.json()
-            if resp.status != 204:
-                msg = 'unable to delete/stop tunnel'
-                logging.warning(data['msg'])
-                raise TunnelError(data['msg'])
+        logging.debug("DELETE '/api/tunnels/{name}'")
+        if resp.status != 204:
+            msg = 'unable to delete/stop tunnel'
+            msg = data['msg'] if 'msg' in data else msg
+            logging.warning(msg)
+            raise TunnelError(msg)
 
     def _url(self, path: str) -> str:
         url = '{}/{}'.format(self.api_url.rstrip('/'), path.rstrip('/'))
@@ -152,3 +171,7 @@ class Session:
                       uri=item['uri'],
                       proto=item['proto'],
                       public_url=item['public_url'])
+
+    @staticmethod
+    def _bad_status(resp: aiohttp.ClientResponse):
+        return str(resp.status)[0] != '2'

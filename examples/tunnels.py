@@ -1,6 +1,15 @@
 import asyncio
+import logging
 
 import aiongrok
+
+handler = logging.StreamHandler()
+handler.setLevel(logging.DEBUG)
+handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+logger.addHandler(handler)
 
 
 async def main():
@@ -18,6 +27,8 @@ async def main():
 
     await sess.stop_tunnel(tun0.name)
     await sess.stop_tunnel(tun1.name)
+
+    print((await sess.start_tunnel()).public_url)
 
     sess.close()
 
